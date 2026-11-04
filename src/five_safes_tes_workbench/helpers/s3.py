@@ -1,28 +1,27 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import minio
-from minio import Minio
+from botocore.exceptions import ClientError
 
-from ..schema.config_schema import ConfigValidationModel
 from ..utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
 
 logger = get_logger(__name__)
 
-STS_ACTION = "AssumeRoleWithWebIdentity"
-STS_VERSION = "2011-06-15"
-
 
 @dataclass
-class MinioCredentials:
+class S3Credentials:
     """
-    MinIO credentials type.
+    Temporary S3 credentials returned by the STS token exchange.
 
     Attributes:
     -----------
-    - access_key: The access key for the MinIO client.
-    - secret_key: The secret key for the MinIO client.
-    - session_token: The session token for the MinIO client.
+    - access_key: Access key for the S3 client.
+    - secret_key: Secret key for the S3 client.
+    - session_token: Session token for the S3 client.
     """
 
     access_key: str
@@ -31,9 +30,9 @@ class MinioCredentials:
 
 
 def list_results(
-    client: Minio,
-    config: ConfigValidationModel,
+    client: "S3Client",
     task_id: str,
+    bucket: str,
 ) -> list[str]:
     """
     List all output objects written by a task.
@@ -44,20 +43,24 @@ def list_results(
     Parameters
     ----------
     - task_id: ID returned by the TES submission.
-    - client: MinIO client (should be already initialized before calling this function).
-    - config: ConfigValidationModel (should be already validated before calling this function).
+    - client: boto3 S3 client (should be already initialized before calling this function).
+    - bucket: Output bucket for the project.
 
     Returns
     -------
     List of object names found under the task prefix.
     """
 
-    resolved_bucket = config.minio_output_bucket
     prefix = f"{task_id}/"
 
     try:
-        objects = client.list_objects(resolved_bucket, prefix=prefix, recursive=True)
-        names = [obj.object_name for obj in objects if obj.object_name is not None]
+        paginator = client.get_paginator("list_objects_v2")
+        names = [
+            obj["Key"]
+            for page in paginator.paginate(Bucket=bucket, Prefix=prefix)
+            for obj in page.get("Contents", [])
+            if obj.get("Key")
+        ]
         if not names:
             logger.warning("No result objects found for task %s", task_id)
             return []
@@ -69,21 +72,21 @@ def list_results(
 
 
 def download_result(
-    client: Minio,
-    config: ConfigValidationModel,
+    client: "S3Client",
     object_path: str,
     output_dir: Path,
+    bucket: str,
 ) -> Path:
     """
-    Download a single result object from MinIO to a local file.
+    Download a single result object from S3 to a local file.
 
     The ``<task_id>/`` prefix is stripped from ``object_path`` so that
     only the filename (and any sub-path) is preserved under ``output_dir``.
 
     Parameters
     ----------
-    - client: Authenticated MinIO client.
-    - config: Validated infrastructure configuration.
+    - client: Authenticated boto3 S3 client.
+    - bucket: Output bucket for the project.
     - object_path: Full object path within the bucket (e.g.
         ``"<task_id>/output.csv"``).
     - output_dir: Local directory to write the file into.
@@ -92,7 +95,6 @@ def download_result(
     -------
     The :class:`~pathlib.Path` of the downloaded local file.
     """
-    resolved_bucket = config.minio_output_bucket
 
     # Strip the leading <task_id>/ prefix so the filename is clean.
     parts = object_path.split("/", 1)
@@ -102,12 +104,12 @@ def download_result(
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        client.fget_object(resolved_bucket, object_path, str(local_path))
+        client.download_file(bucket, object_path, str(local_path))
         logger.info("Downloaded %s -> %s", object_path, local_path)
-    except minio.error.S3Error as e:
-        if e.code == "NoSuchKey":
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code")
+        if error_code in {"NoSuchKey", "404"}:
             logger.warning("Object not found, skipping: %s", object_path)
-            raise
         raise
 
     return local_path

@@ -79,12 +79,12 @@ class WorkbenchTESBuilder:
             params: TES task parameters.
         """
 
-        name = params["name"]
-        executors = self._build_executors(params["executors"])
-        inputs = self._build_inputs(params.get("inputs", []) or [])
-        outputs = self._build_outputs(params.get("outputs", []) or [])
-        description = params.get("description")
-        volumes = params.get("volumes")
+        name = params.name
+        executors = self._build_executors(params.executors)
+        inputs = self._build_inputs(params.inputs or [])
+        outputs = self._build_outputs(params.outputs or [])
+        description = params.description
+        volumes = params.volumes
 
         self._tes_task = tes.Task(
             name=name,
@@ -119,16 +119,7 @@ class WorkbenchTESBuilder:
             )
 
         return [
-            tes.Executor(
-                image=executor["image"],
-                command=executor["command"],
-                workdir=executor.get("workdir"),
-                stdin=executor.get("stdin"),
-                stdout=executor.get("stdout"),
-                stderr=executor.get("stderr"),
-                env=executor.get("env"),
-                ignore_error=executor.get("ignore_error"),
-            )
+            executor.make_tes_executor()
             for executor in executors
         ]
 
@@ -140,15 +131,7 @@ class WorkbenchTESBuilder:
         Converts a list of InputTESParams into tes.Input objects.
         """
         return [
-            tes.Input(
-                name=input.get("name"),
-                description=input.get("description"),
-                url=input.get("url"),
-                path=input["path"],
-                type=input.get("type", "DIRECTORY"),
-                content=input.get("content"),
-                streamable=input.get("streamable"),
-            )
+            input.make_tes_inputs()
             for input in inputs
         ]
 
@@ -160,13 +143,6 @@ class WorkbenchTESBuilder:
         Converts a list of OutputTESParams into tes.Output objects.
         """
         return [
-            tes.Output(
-                name=output.get("name"),
-                description=output.get("description"),
-                url=output["url"],
-                path=output["path"],
-                type=output.get("type", "DIRECTORY"),
-                path_prefix=output.get("path_prefix"),
-            )
+            output.make_tes_outputs()
             for output in outputs
         ]

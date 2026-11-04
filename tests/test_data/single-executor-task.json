@@ -1,0 +1,45 @@
+{
+         "name": "intes",
+         "description": null,
+         "inputs": [
+                  {
+                           "name": "Infile",
+                           "description": "Input file",
+                           "url": "s3://tesdata.txt",
+                           "path": "/tesdata.txt",
+                           "type": "FILE",
+                           "content": ""
+                  }
+         ],
+         "outputs": [
+                  {
+                           "name": "Stdout",
+                           "description": "Stdout results",
+                           "url": "s3://",
+                           "path": "/outputs",
+                           "type": "DIRECTORY"
+                  }
+         ],
+         "resources": null,
+         "executors": [
+                  {
+                           "image": "ubuntu",
+                           "command": [
+                                    "cat",
+                                    "/data/tesdata.txt"
+                           ],
+                           "workdir": "/outputs",
+                           "stdin": null,
+                           "stdout": "/outputs/stdout",
+                           "stderr": null,
+                           "env": null
+                  }
+         ],
+         "volumes": null,
+         "tags": {
+                  "project": "BRAID",
+                  "tres": "warrentron"
+         },
+         "logs": null,
+         "creation_time": null
+}

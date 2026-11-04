@@ -1,0 +1,85 @@
+{
+         "id": "3683",
+         "state": 0,
+         "name": "Test - DrugUtilisation add metrics",
+         "description": "Generate an acetaminophen cohort, add drug utilisation metrics, summarise one metric, then clean up",
+         "inputs": null,
+         "outputs": [
+                  {
+                           "name": "Query Results",
+                           "description": "Drug utilisation metric summary",
+                           "url": "s3://",
+                           "path": "/outputs",
+                           "type": "DIRECTORY"
+                  }
+         ],
+         "resources": null,
+         "executors": [
+                  {
+                           "image": "ghcr.io/health-informatics-uon/omop-r-tools:edge",
+                           "command": [
+                                    "Rscript",
+                                    "inst/scripts/generateIngredientCohortSet.R",
+                                    "du_add_metrics_test_1",
+                                    "--ingredient=acetaminophen",
+                                    "--gapEra=7"
+                           ],
+                           "workdir": null,
+                           "stdin": null,
+                           "stdout": null,
+                           "stderr": null,
+                           "env": {}
+                  },
+                  {
+                           "image": "ghcr.io/health-informatics-uon/omop-r-tools:edge",
+                           "command": [
+                                    "Rscript",
+                                    "inst/scripts/addDrugUtilisation.R",
+                                    "du_add_metrics_test_1",
+                                    "--ingredientConceptId=1125315",
+                                    "--gapEra=7"
+                           ],
+                           "workdir": null,
+                           "stdin": null,
+                           "stdout": null,
+                           "stderr": null,
+                           "env": {}
+                  },
+                  {
+                           "image": "ghcr.io/health-informatics-uon/omop-r-tools:edge",
+                           "command": [
+                                    "Rscript",
+                                    "inst/scripts/summariseCohort.R",
+                                    "du_add_metrics_test_1",
+                                    "--variables=[\"days_exposed_ingredient_1125315_descendants\"]",
+                                    "--estimates=[\"mean\",\"median\",\"q25\",\"q75\"]",
+                                    "--output-path=outputs/drug_utilisation_metrics.csv"
+                           ],
+                           "workdir": null,
+                           "stdin": null,
+                           "stdout": null,
+                           "stderr": null,
+                           "env": {}
+                  },
+                  {
+                           "image": "ghcr.io/health-informatics-uon/omop-r-tools:edge",
+                           "command": [
+                                    "Rscript",
+                                    "inst/scripts/cleanUpCohortTables.R",
+                                    "du_add_metrics_test_1"
+                           ],
+                           "workdir": null,
+                           "stdin": null,
+                           "stdout": null,
+                           "stderr": null,
+                           "env": {}
+                  }
+         ],
+         "volumes": null,
+         "tags": {
+                  "Project": "DelphiDemo",
+                  "tres": "Nottingham TRE 01|Nottingham TRE 02"
+         },
+         "logs": null,
+         "creation_time": null
+}
